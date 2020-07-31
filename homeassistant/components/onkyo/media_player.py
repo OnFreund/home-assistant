@@ -463,9 +463,9 @@ class OnkyoAVR(MediaPlayerEntity):
         if media_type.lower() == "radio" and source in DEFAULT_PLAYABLE_SOURCES:
             self._update_avr("preset", media_id)
 
-    async def async_select_output(self, output):
+    async def async_select_output(self, hdmi_output):
         """Set hdmi-out."""
-        self._update_avr("hdmi-output-selector", output)
+        self._update_avr("hdmi-output-selector", hdmi_output)
 
     @callback
     def _parse_source(self, source):
