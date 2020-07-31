@@ -343,6 +343,7 @@ class OnkyoAVR(MediaPlayerEntity):
 
         self.async_write_ha_state()
 
+    @callback
     def backfill_state(self):
         """Get the receiver to send all the info we care about.
 
@@ -533,10 +534,12 @@ class OnkyoAVR(MediaPlayerEntity):
         self._query_avr("video-information")
         self._query_timer = None
 
+    @callback
     def _update_avr(self, propname, value):
         """Update a property in the AVR."""
         self._avr.update_property(self._zone, propname, value)
 
+    @callback
     def _query_avr(self, propname):
         """Cause the AVR to send an update about propname."""
         self._avr.query_property(self._zone, propname)
