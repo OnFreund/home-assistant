@@ -3,7 +3,6 @@ import pytest
 
 import homeassistant.components.automation as automation
 from homeassistant.components.onvif import DOMAIN
-from homeassistant.components.onvif.device import ONVIFDevice
 from homeassistant.components.onvif.event import (
     CONF_ONVIF_EVENT,
     CONF_UNIQUE_ID,
@@ -13,6 +12,7 @@ from homeassistant.components.onvif.event import (
 from homeassistant.helpers import device_registry
 from homeassistant.setup import async_setup_component
 
+from tests.async_mock import PropertyMock, patch
 from tests.common import (
     MockConfigEntry,
     assert_lists_same,
@@ -34,18 +34,39 @@ def calls(hass):
     return async_mock_service(hass, "test", "automation")
 
 
+async def _setup_integration(hass):
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={
+            "name": "test name",
+            "host": "test host",
+            "port": 1234,
+            "username": "test username",
+            "password": "test password",
+            "snapshot_auth": "digest",
+        },
+        options={},
+        unique_id="12:34:56:AB:CD:EF",
+    )
+    entry.add_to_hass(hass)
+
+    with patch(
+        "homeassistant.components.onvif.ONVIFDevice.async_setup", return_value=True
+    ), patch("homeassistant.components.onvif.ONVIFDevice.async_stop"):
+        await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+
+    return entry
+
+
 async def test_get_triggers(hass, device_reg):
     """Test we get the expected triggers from a onvif."""
     # Add ONVIF config entry
-    onvif_config_entry = MockConfigEntry(
-        domain=DOMAIN, unique_id="12:34:56:AB:CD:EF", data={}
-    )
-    onvif_config_entry.add_to_hass(hass)
+    onvif_config_entry = await _setup_integration(hass)
     device_entry = device_reg.async_get_or_create(
         config_entry_id=onvif_config_entry.entry_id,
         connections={(device_registry.CONNECTION_NETWORK_MAC, "12:34:56:AB:CD:EF")},
     )
-
     # Add another config entry for this device
     unifi_config_entry = MockConfigEntry(
         domain="unifi", unique_id="12:34:56:AB:CD:EF", data={}
@@ -55,20 +76,20 @@ async def test_get_triggers(hass, device_reg):
         config_entry_id=unifi_config_entry.entry_id,
         connections={(device_registry.CONNECTION_NETWORK_MAC, "12:34:56:AB:CD:EF")},
     )
-
-    # Create device and mock event
-    device = ONVIFDevice(hass, onvif_config_entry)
-    device.events = EventManager(hass, None, onvif_config_entry.unique_id)
+    manager = EventManager(hass, None, onvif_config_entry.unique_id)
     # pylint: disable=protected-access
-    device.events._events = {
+    manager._events = {
         f"{onvif_config_entry.unique_id}_tns1:RuleEngine/LineDetector/Crossed_0_0_0": Event(
             f"{onvif_config_entry.unique_id}_tns1:RuleEngine/LineDetector/Crossed_0_0_0",
             "0 Line Crossed",
             "event",
         )
     }
-    hass.data[DOMAIN] = {}
-    hass.data[DOMAIN][onvif_config_entry.unique_id] = device
+    with patch(
+        "homeassistant.components.onvif.ONVIFDevice.events",
+        new_callable=PropertyMock(return_value=manager),
+    ):
+        triggers = await async_get_device_automations(hass, "trigger", device_entry.id)
 
     # Only expect triggers for ONVIF domain
     expected_triggers = [
@@ -81,12 +102,13 @@ async def test_get_triggers(hass, device_reg):
             "unique_id": f"{onvif_config_entry.unique_id}_tns1:RuleEngine/LineDetector/Crossed_0_0_0",
         },
     ]
-    triggers = await async_get_device_automations(hass, "trigger", device_entry.id)
+
     assert_lists_same(triggers, expected_triggers)
 
 
 async def test_if_fires_on_event(hass, calls):
     """Test that onvif_event triggers firing."""
+    await _setup_integration(hass)
     event_uid = "12:34:56:AB:CD:EF_tns1:RuleEngine/LineDetector/Crossed_0_0_0"
 
     assert await async_setup_component(
@@ -118,7 +140,7 @@ async def test_if_fires_on_event(hass, calls):
     )
 
     # Fire event
-    hass.bus.fire(CONF_ONVIF_EVENT, {CONF_UNIQUE_ID: event_uid})
+    hass.bus.async_fire(CONF_ONVIF_EVENT, {CONF_UNIQUE_ID: event_uid})
     await hass.async_block_till_done()
     assert len(calls) == 1
     assert calls[0].data["some"] == f"device - {CONF_ONVIF_EVENT} - {event_uid}"

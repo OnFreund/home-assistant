@@ -232,7 +232,7 @@ class EventManager:
             self._events[event.uid] = event
 
             if event.platform == "event" and event.enabled:
-                self.hass.bus.fire(CONF_ONVIF_EVENT, {CONF_UNIQUE_ID: event.uid})
+                self.hass.bus.async_fire(CONF_ONVIF_EVENT, {CONF_UNIQUE_ID: event.uid})
 
     def get_uid(self, uid) -> Event:
         """Retrieve event for given id."""

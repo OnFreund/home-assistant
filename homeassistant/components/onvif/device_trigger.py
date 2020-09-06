@@ -3,11 +3,9 @@ from typing import List
 
 import voluptuous as vol
 
-from homeassistant.components.automation import (
-    AutomationActionType,
-    event as automation_event,
-)
+from homeassistant.components.automation import AutomationActionType
 from homeassistant.components.device_automation import TRIGGER_BASE_SCHEMA
+from homeassistant.components.homeassistant.triggers import event as event_trigger
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_DEVICE_ID, CONF_DOMAIN, CONF_PLATFORM, CONF_TYPE
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant
@@ -63,12 +61,12 @@ async def async_attach_trigger(
     config = TRIGGER_SCHEMA(config)
 
     event_config = {
-        automation_event.CONF_PLATFORM: "event",
-        automation_event.CONF_EVENT_TYPE: "onvif_event",
-        automation_event.CONF_EVENT_DATA: {CONF_UNIQUE_ID: config[CONF_UNIQUE_ID]},
+        event_trigger.CONF_PLATFORM: "event",
+        event_trigger.CONF_EVENT_TYPE: "onvif_event",
+        event_trigger.CONF_EVENT_DATA: {CONF_UNIQUE_ID: config[CONF_UNIQUE_ID]},
     }
 
-    event_config = automation_event.TRIGGER_SCHEMA(event_config)
-    return await automation_event.async_attach_trigger(
+    event_config = event_trigger.TRIGGER_SCHEMA(event_config)
+    return await event_trigger.async_attach_trigger(
         hass, event_config, action, automation_info, platform_type="device"
     )

@@ -45,7 +45,7 @@ class ONVIFDevice:
         self.available: bool = True
 
         self.device: ONVIFCamera = None
-        self.events: EventManager = None
+        self._events: EventManager = None
 
         self.info: DeviceInfo = DeviceInfo()
         self.capabilities: Capabilities = Capabilities()
@@ -79,6 +79,11 @@ class ONVIFDevice:
         """Return the password of this device."""
         return self.config_entry.data[CONF_PASSWORD]
 
+    @property
+    def events(self):
+        """Return the event manager for this device."""
+        return self._events
+
     async def async_setup(self) -> bool:
         """Set up the device."""
         self.device = get_device(
@@ -101,7 +106,7 @@ class ONVIFDevice:
                 self.device.create_ptz_service()
 
             if self.capabilities.events:
-                self.events = EventManager(
+                self._events = EventManager(
                     self.hass, self.device, self.config_entry.unique_id
                 )
 
